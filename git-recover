@@ -1,0 +1,179 @@
+#!/bin/bash
+#
+# git-recover: recover deleted files in your repo
+# Copyright (c) Edward Thomson.  All rights reserved.
+# Available under the MIT license; see the included LICENSE file.
+#
+# vim: set expandtab:ts=4:sw=4:number
+
+set -e
+
+IFS=$'\n'
+
+PROGNAME=$(echo "$0" | sed -e 's/.*\///')
+GIT_DIR=$(git rev-parse --git-dir)
+
+DO_RECOVER=0
+DO_FULL=0
+BLOBS=()
+FILENAMES=()
+
+function die_usage {
+    echo "usage: $PROGNAME [-a] [--full] [<id> [-f <filename>] ...]" >&2
+    exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+    -a|--all)
+        DO_RECOVER=1
+        ;;
+    --full)
+        DO_FULL=1
+        ;;
+    *)
+        if [ "${1:0:1}" == "-" ]; then
+            echo "$PROGNAME: unknown argument: $1" >&2
+            die_usage
+        fi
+        BLOBS+=("$1")
+
+        shift
+        if [ "$1" == "-f" ] || [ "$1" == "--filename" ]; then
+            shift
+            if [ $# == 0 ]; then
+                die_usage
+            fi
+            FILENAMES+=("$1")
+            shift
+        else
+            FILENAMES+=("")
+        fi
+        continue
+    ;;
+    esac
+    shift
+done
+
+if [ ${#BLOBS[@]} != 0 ] && [ $DO_RECOVER == 1 ]; then
+    die_usage
+elif [ ${#BLOBS[@]} != 0 ]; then
+    DO_RECOVER=1
+fi
+
+case "$OSTYPE" in
+    darwin*|freebsd*) IS_BSD=1 ;;
+    *) IS_BSD=0 ;;
+esac
+
+function expand_given_blobs() {
+    for i in "${!BLOBS[@]}"; do
+        ID=$(git rev-parse --verify "${BLOBS[$i]}" 2>/dev/null || true)
+
+        if [ -z "$ID" ]; then
+            echo "$PROGNAME: ${BLOBS[$i]} is not a valid object." 1>&2
+            exit 1
+        fi
+
+        TYPE=$(git cat-file -t "${ID}" 2>/dev/null || true)
+
+        if [ "$TYPE" != "blob" ]; then
+            echo "$PROGNAME: ${BLOBS[$i]} is not a blob." 1>&2
+            exit
+        fi
+
+        BLOBS[$i]=$ID
+    done
+}
+
+# find all the unreachable blobs
+function find_unreachable() {
+    FULLNESS="--no-full"
+
+    if [ $DO_FULL == 1 ]; then FULLNESS="--full"; fi
+
+    BLOBS=($(git fsck --unreachable --no-reflogs \
+        "${FULLNESS}" --no-progress | sed -ne 's/^unreachable blob //p'))
+}
+
+function write_one_file {
+    BLOB=$1
+    FILTER_NAME=$2
+    OUTPUT_NAME=$3
+    ARGS=()
+
+    if [ -z "$FILTER_NAME" ]; then
+        ARGS+=("blob")
+    else
+        ARGS+=("--filters" "--path=$FILTER_NAME")
+    fi
+
+    echo -n "Writing $BLOB: "
+    git cat-file "${ARGS[@]}" "$BLOB" > "$OUTPUT_NAME"
+    echo "$OUTPUT_NAME"
+}
+
+function write_recoverable {
+    for i in "${!BLOBS[@]}"; do
+        BLOB=${BLOBS[$i]}
+        FILTER_NAME=${FILENAMES[$i]}
+        OUTPUT_NAME=${FILENAMES[$i]:-$BLOB}
+
+        write_one_file "$BLOB" "$FILTER_NAME" "$OUTPUT_NAME"
+    done
+}
+
+function file_time {
+    if [ $IS_BSD == 1 ]; then
+        stat -f %c "$1"
+    else
+        stat -c %Y "$1"
+    fi
+}
+
+function timestamp_to_s {
+    if [ $IS_BSD == 1 ]; then
+        date -r "$1"
+    else
+        date -d @"$1"
+    fi
+}
+
+function print_recoverable {
+    # sort blobs in loose objects by their timestamp (packed blobs last)
+    BLOB_AND_TIMESTAMPS=($(for BLOB in "${BLOBS[@]}"; do
+        LOOSE="${BLOB::2}/${BLOB:2}"
+        TIME=$(file_time "$GIT_DIR/objects/$LOOSE" 2>/dev/null || true)
+        echo "$BLOB $TIME"
+    done | sort -k2 -r))
+
+    echo "Recoverable orphaned git blobs:"
+    echo ""
+
+    for BLOB_AND_TIMESTAMP in "${BLOB_AND_TIMESTAMPS[@]}"; do
+        BLOB=${BLOB_AND_TIMESTAMP::40}
+        TIME=${BLOB_AND_TIMESTAMP:41}
+        DATE=$([ ! -z "$TIME" ] && timestamp_to_s "$TIME" || echo "(Unknown)") 
+
+        echo "$BLOB  $DATE"
+    done
+}
+
+
+if [ ${#BLOBS[@]} != 0 ]; then
+    expand_given_blobs
+else
+    find_unreachable
+fi
+
+if [ ${#BLOBS[@]} == 0 ]; then
+    echo "$PROGNAME: no recoverable orphaned blobs."
+    exit
+fi
+
+if [ $DO_RECOVER == 1 ]; then
+    write_recoverable
+else
+    print_recoverable
+fi
+

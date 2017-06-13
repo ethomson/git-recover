@@ -15,11 +15,12 @@ GIT_DIR=$(git rev-parse --git-dir)
 
 DO_RECOVER=0
 DO_FULL=0
+DO_INTERACTIVE=0
 BLOBS=()
 FILENAMES=()
 
 function die_usage {
-    echo "usage: $PROGNAME [-a] [--full] [<id> [-f <filename>] ...]" >&2
+    echo "usage: $PROGNAME [-a] [-i] [--full] [<id> [-f <filename>] ...]" >&2
     exit 1
 }
 
@@ -27,6 +28,9 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
     -a|--all)
         DO_RECOVER=1
+        ;;
+    -i|--interactive)
+        DO_INTERACTIVE=1
         ;;
     --full)
         DO_FULL=1
@@ -96,10 +100,9 @@ function find_unreachable() {
         "${FULLNESS}" --no-progress | sed -ne 's/^unreachable blob //p'))
 }
 
-function write_one_file {
+function read_one_file {
     BLOB=$1
     FILTER_NAME=$2
-    OUTPUT_NAME=$3
     ARGS=()
 
     if [ -z "$FILTER_NAME" ]; then
@@ -108,9 +111,19 @@ function write_one_file {
         ARGS+=("--filters" "--path=$FILTER_NAME")
     fi
 
-    echo -n "Writing $BLOB: "
-    git cat-file "${ARGS[@]}" "$BLOB" > "$OUTPUT_NAME"
-    echo "$OUTPUT_NAME"
+    git cat-file "${ARGS[@]}" "$BLOB"
+}
+
+function write_one_file {
+    BLOB=$1
+    FILTER_NAME=$2
+    OUTPUT_NAME=$3
+
+    ABBREV=$(git rev-parse --short "${BLOB}")
+
+    echo -n "Writing $ABBREV: "
+    read_one_file "$BLOB" "$FILTER_NAME" > "$OUTPUT_NAME"
+    echo "$OUTPUT_NAME."
 }
 
 function write_recoverable {
@@ -139,23 +152,73 @@ function timestamp_to_s {
     fi
 }
 
-function print_recoverable {
+function sort_by_timestamp {
     # sort blobs in loose objects by their timestamp (packed blobs last)
     BLOB_AND_TIMESTAMPS=($(for BLOB in "${BLOBS[@]}"; do
         LOOSE="${BLOB::2}/${BLOB:2}"
         TIME=$(file_time "$GIT_DIR/objects/$LOOSE" 2>/dev/null || true)
         echo "$BLOB $TIME"
     done | sort -k2 -r))
+}
 
+function print_recoverable {
     echo "Recoverable orphaned git blobs:"
     echo ""
 
+    sort_by_timestamp
     for BLOB_AND_TIMESTAMP in "${BLOB_AND_TIMESTAMPS[@]}"; do
         BLOB=${BLOB_AND_TIMESTAMP::40}
         TIME=${BLOB_AND_TIMESTAMP:41}
         DATE=$([ ! -z "$TIME" ] && timestamp_to_s "$TIME" || echo "(Unknown)") 
 
         echo "$BLOB  $DATE"
+    done
+}
+
+function show_summary {
+    FILETYPE=$(read_one_file "${BLOB}" | file -b -)
+    IS_TEXT=$(echo "${FILETYPE}" | grep -c ' text$' 2>/dev/null || true)
+
+    if [ "$IS_TEXT" == "1" ]; then
+        read_one_file "${BLOB}"
+    else
+        read_one_file "${BLOB}" | hexdump -C
+    fi
+}
+
+function interactive {
+    echo "Recoverable orphaned git blobs:"
+
+    sort_by_timestamp
+    for BLOB_AND_TIMESTAMP in "${BLOB_AND_TIMESTAMPS[@]}"; do
+        echo
+
+        BLOB=${BLOB_AND_TIMESTAMP::40}
+        TIME=${BLOB_AND_TIMESTAMP:41}
+        DATE=$([ ! -z "$TIME" ] && timestamp_to_s "$TIME" || echo "(Unknown)") 
+
+        echo "$BLOB  ($DATE)"
+        show_summary "${BLOB}" | head -4 | sed -e 's/^/> /'
+        echo
+
+        while true
+        do
+            echo -n "Recover this file? [y,n,q]: "
+            read -r ans || return 1
+
+            case "$ans" in
+            [yY]*)
+                write_one_file "${BLOB}" "" "${BLOB}"
+                break
+                ;;
+            [nN]*)
+                break
+                ;;
+           [qQ]*)
+                return 0
+                ;;
+            esac
+        done
     done
 }
 
@@ -171,7 +234,9 @@ if [ ${#BLOBS[@]} == 0 ]; then
     exit
 fi
 
-if [ $DO_RECOVER == 1 ]; then
+if [ $DO_INTERACTIVE == 1 ]; then
+    interactive
+elif [ $DO_RECOVER == 1 ]; then
     write_recoverable
 else
     print_recoverable

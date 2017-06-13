@@ -41,11 +41,14 @@ repository (but haven't yet been garbage collected), you can run:
 
 Options
 -------
-    git-recover [-a] [--full] [<id> [-f <filename>] ...]
+    git-recover [-a] [-i] [--full] [<id> [-f <filename>] ...]
 
 `-a`, `--all`  
 Write all orphaned blobs to the current working directory.  Each file will
 be named using its 40 character object ID.
+
+`-i`, `--interactive`  
+Display information about each orphaned blob and prompt to recover it.
 
 `--full`  
 List or recover all orphaned blobs, even those that are in packfiles.  By 

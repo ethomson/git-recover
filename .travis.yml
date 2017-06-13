@@ -1,11 +1,11 @@
-language: sh
+language: bash
 
-os:
-  - linux
-
-before_script:
-  - sudo apt-get -y update
-  - sudo apt-get -y install shellcheck
+addons:
+  apt:
+    sources:
+      - debian-sid
+    packages:
+      - shellcheck
 
 script:
   - shellcheck git-recover

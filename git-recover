@@ -126,11 +126,28 @@ function write_one_file {
     echo "$OUTPUT_NAME."
 }
 
+function unique_filename {
+    if [ ! -f "${BLOB}" ]; then
+        echo "$BLOB"
+    else
+        cnt=1
+        while true
+        do
+            fn="${BLOB}~${cnt}"
+            if [ ! -f "${fn}" ]; then
+                echo "${fn}"
+                break
+            fi
+            cnt=$((cnt+1))
+        done
+    fi
+}
+
 function write_recoverable {
     for i in "${!BLOBS[@]}"; do
         BLOB=${BLOBS[$i]}
         FILTER_NAME=${FILENAMES[$i]}
-        OUTPUT_NAME=${FILENAMES[$i]:-$BLOB}
+        OUTPUT_NAME=${FILENAMES[$i]:-$(unique_filename)}
 
         write_one_file "$BLOB" "$FILTER_NAME" "$OUTPUT_NAME"
     done
@@ -235,7 +252,7 @@ function interactive {
 
             case "$ans" in
             [yY]*)
-                write_one_file "${BLOB}" "" "${BLOB}"
+                write_one_file "${BLOB}" "" "$(unique_filename)"
                 break
                 ;;
             [nN]*)

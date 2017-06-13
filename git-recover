@@ -176,8 +176,26 @@ function print_recoverable {
 }
 
 function prompt_for_filename {
-    echo -n "Filename (return to skip): "
-    read -r FILENAME
+    while true
+    do
+        echo -n "Filename (return to skip): "
+        read -r FILENAME
+
+        if [ -f "$FILENAME" ]; then
+            echo -n "File exists, overwrite? [y,N]: "
+            read -r overwrite
+
+            case "$overwrite" in
+            [yY]*)
+                return 0
+                ;;
+            esac
+
+            echo
+        else
+            return 0
+        fi
+    done
 }
 
 function view_file {

@@ -9,6 +9,13 @@ committed.
 Getting Started
 ---------------
 
+The simplest way to use `git-recover` is in interactive mode - simply run
+`git-recover -i` and it will show you all the files that you can recover
+and prompt you to act.
+
+Using git-recover
+-----------------
+
 Running `git-recover` without any arguments will list all the files (git
 "blobs") that were recently orphaned, by their ID.  (Their filename is not 
 known.)

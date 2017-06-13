@@ -1,0 +1,18 @@
+language: sh
+
+os:
+  - linux
+
+before_script:
+  - sudo apt-get -y update
+  - sudo apt-get -y install shellcheck
+
+script:
+  - shellcheck git-recover
+
+notifications:
+  email: false
+
+branches:
+  only:
+    - master

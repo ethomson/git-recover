@@ -175,6 +175,15 @@ function print_recoverable {
     done
 }
 
+function prompt_for_filename {
+    echo -n "Filename (return to skip): "
+    read -r FILENAME
+}
+
+function view_file {
+    read_one_file "${BLOB}" | ${PAGER:-less}
+}
+
 function show_summary {
     FILETYPE=$(read_one_file "${BLOB}" | file -b -)
     IS_TEXT=$(echo "${FILETYPE}" | grep -c ' text$' 2>/dev/null || true)
@@ -203,7 +212,7 @@ function interactive {
 
         while true
         do
-            echo -n "Recover this file? [y,n,q]: "
+            echo -n "Recover this file? [y,n,v,f,q,?]: "
             read -r ans || return 1
 
             case "$ans" in
@@ -214,7 +223,31 @@ function interactive {
             [nN]*)
                 break
                 ;;
-           [qQ]*)
+            [vV]*)
+                view_file "${BLOB}"
+                echo
+                ;;
+            [fF]*)
+                prompt_for_filename
+
+                if [ "$FILENAME" == "" ]; then
+                    break
+                fi
+
+                write_one_file "${BLOB}" "${FILENAME}" "${FILENAME}"
+                break
+                ;;
+            \?*)
+                echo
+                echo "Do you want to recover this file?"
+                echo " y: yes, write the file to ${BLOB}"
+                echo " n: no, skip this file and see the next orphaned file"
+                echo " v: view the file"
+                echo " f: prompt for a filename to use for recovery"
+                echo " q: quit"
+                echo
+                ;;
+            [qQ]*)
                 return 0
                 ;;
             esac

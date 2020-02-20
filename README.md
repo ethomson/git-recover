@@ -1,6 +1,8 @@
 git-recover: recover deleted files in your repository
 ===========
 
+[![CI](https://github.com/ethomson/git-recover/workflows/CI/badge.svg)](https://github.com/ethomson/git-recover/actions?query=workflow%3ACI)
+
 `git-recover` allows you to recover some files that you've accidentally deleted
 from your working directory.  It helps you find files that exist in the
 repository's object database - because you ran `git add` - but were never

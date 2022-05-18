@@ -96,8 +96,9 @@ function find_unreachable() {
 
     if [ $DO_FULL == 1 ]; then FULLNESS="--full"; fi
 
-    BLOBS=($(git fsck --unreachable --no-reflogs \
-        "${FULLNESS}" --no-progress | sed -ne 's/^unreachable blob //p'))
+    BLOBS=($(git fsck --unreachable --no-reflogs "${FULLNESS}" \
+                      --no-progress 2>/dev/null | \
+             sed -E -ne 's/^unreachable blob |dangling blob //p'))
 }
 
 function read_one_file {

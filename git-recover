@@ -19,8 +19,41 @@ DO_INTERACTIVE=0
 BLOBS=()
 FILENAMES=()
 
+function print_usage {
+    echo "usage: $PROGNAME [-a] [-i] [--full] [<id> [-f <filename>] ...]"
+}
+
+function show_help {
+    print_usage
+
+    echo ""
+    echo "Recover deleted files in your git repository"
+    echo ""
+    echo "Options:"
+    echo "  -a, --all            Write all orphaned blobs to the current working"
+    echo "                       directory. Each file will be named using its 40"
+    echo "                       character object ID."
+    echo "  -i, --interactive    Display information about each orphaned blob and then"
+    echo "                       prompt to recover it."
+    echo "  --full               List or recover all orphaned blobs, even those that"
+    echo "                       are in packfiles. By default, git-recover will only"
+    echo "                       look at loose object files, which limits it to the"
+    echo "                       most recently created files. Examining packfiles may"
+    echo "                       be slow, especially in large repositories."
+    echo "  <id>                 The object ID (or its abbreviation) to recover. The"
+    echo "                       file will be written to the current working directory"
+    echo "                       and named using its 40 character object ID, unless the"
+    echo "                       -f option is specified."
+    echo "  -f, --filename name  When specified after an object ID, the file written"
+    echo "                       will use this filename. In addition, any filters"
+    echo "                       (for example: CRLF conversion or Git-LFS) will be run"
+    echo "                       according to the gitattributes configuration."
+
+    exit 0
+}
+
 function die_usage {
-    echo "usage: $PROGNAME [-a] [-i] [--full] [<id> [-f <filename>] ...]" >&2
+    print_usage >&2
     exit 1
 }
 
@@ -34,6 +67,9 @@ while [[ $# -gt 0 ]]; do
         ;;
     --full)
         DO_FULL=1
+        ;;
+    -h|--help)
+        show_help
         ;;
     *)
         if [ "${1:0:1}" == "-" ]; then

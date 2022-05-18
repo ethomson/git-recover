@@ -223,7 +223,7 @@ function print_recoverable {
     for BLOB_AND_TIMESTAMP in "${BLOB_AND_TIMESTAMPS[@]}"; do
         BLOB=${BLOB_AND_TIMESTAMP::40}
         TIME=${BLOB_AND_TIMESTAMP:41}
-        DATE=$([ ! -z "$TIME" ] && timestamp_to_s "$TIME" || echo "(Unknown)") 
+        DATE=$([ -n "$TIME" ] && timestamp_to_s "$TIME" || echo "(Unknown)") 
 
         echo "$BLOB  $DATE"
     done
@@ -276,7 +276,7 @@ function interactive {
 
         BLOB=${BLOB_AND_TIMESTAMP::40}
         TIME=${BLOB_AND_TIMESTAMP:41}
-        DATE=$([ ! -z "$TIME" ] && timestamp_to_s "$TIME" || echo "(Unknown)") 
+        DATE=$([ -n "$TIME" ] && timestamp_to_s "$TIME" || echo "(Unknown)") 
 
         echo "$BLOB  ($DATE)"
         show_summary "${BLOB}" | head -4 | sed -e 's/^/> /'

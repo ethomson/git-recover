@@ -132,6 +132,7 @@ function find_unreachable() {
 
     if [ $DO_FULL == 1 ]; then FULLNESS="--full"; fi
 
+    # shellcheck disable=SC2207
     BLOBS=($(git fsck --unreachable --no-reflogs "${FULLNESS}" \
                       --no-progress 2>/dev/null | \
              sed -E -ne 's/^unreachable blob |dangling blob //p'))
@@ -208,6 +209,7 @@ function timestamp_to_s {
 
 function sort_by_timestamp {
     # sort blobs in loose objects by their timestamp (packed blobs last)
+    # shellcheck disable=SC2207
     BLOB_AND_TIMESTAMPS=($(for BLOB in "${BLOBS[@]}"; do
         LOOSE="${BLOB::2}/${BLOB:2}"
         TIME=$(file_time "$GIT_DIR/objects/$LOOSE" 2>/dev/null || true)
